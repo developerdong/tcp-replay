@@ -22,7 +22,7 @@ func (h *TcpStreamFactory) New(netFlow, transportFlow gopacket.Flow) tcpassembly
 		net:       netFlow,
 		transport: transportFlow,
 		r:         tcpreader.NewReaderStream(),
-		w:         conn,
+		c:         conn.(*net.TCPConn),
 	}
 	go stream.run() // Important... we must guarantee that data from the reader stream is read.
 
