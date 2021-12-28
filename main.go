@@ -11,29 +11,18 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/google/gopacket/tcpassembly"
 	"log"
+	"os"
 	"time"
 )
 
 func main() {
-	var networkInterface = flag.String("i", "eth0", "Interface to get packets from")
-	var fileName = flag.String("r", "", "Filename to read from, overrides -i")
-	var snapLen = flag.Int("s", 1600, "SnapLen for pcap packet capture")
 	var filter = flag.String("f", "tcp and dst port 80", "BPF filter for pcap")
 	var logAllPackets = flag.Bool("v", false, "Logs every packet in great detail")
 	var targetAddress = flag.String("t", "localhost:8080", "Target address a copied stream is forwarded to")
 	flag.Parse()
 
-	var handle *pcap.Handle
-	var err error
-
 	// Set up pcap packet capture
-	if *fileName != "" {
-		log.Printf("Reading from pcap dump %q", *fileName)
-		handle, err = pcap.OpenOffline(*fileName)
-	} else {
-		log.Printf("Starting capture on interface %q", *networkInterface)
-		handle, err = pcap.OpenLive(*networkInterface, int32(*snapLen), true, pcap.BlockForever)
-	}
+	handle, err := pcap.OpenOfflineFile(os.Stdin)
 	if err != nil {
 		log.Fatal(err)
 	}
