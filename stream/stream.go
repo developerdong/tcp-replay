@@ -20,6 +20,7 @@ type TcpStream struct {
 }
 
 func (t *TcpStream) run() {
+	log.Println("Start to copy new stream", t.net, t.transport)
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
@@ -37,4 +38,5 @@ func (t *TcpStream) run() {
 		wg.Done()
 	}()
 	wg.Wait()
+	log.Println("Finish copying new stream", t.net, t.transport)
 }
