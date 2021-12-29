@@ -10,11 +10,13 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 )
 
 // TcpStream will handle the actual forwarding of copied tcp streams.
 type TcpStream struct {
 	net, transport gopacket.Flow
+	duration       time.Duration
 	r              tcpreader.ReaderStream
 	c              *net.TCPConn
 }
@@ -33,6 +35,10 @@ func (t *TcpStream) run() {
 		// forward copied data to the remote address
 		if _, err := io.Copy(t.c, &t.r); err != nil {
 			log.Println("Error reading stream", t.net, t.transport, ":", err)
+		} else {
+			// If the original connection terminates correctly, wait for the response from
+			// new connection. Otherwise, the request in the new connection may be cancelled.
+			time.Sleep(t.duration)
 		}
 		_ = t.c.CloseWrite()
 		wg.Done()

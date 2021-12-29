@@ -19,6 +19,7 @@ func main() {
 	var filter = flag.String("f", "tcp and dst port 80", "BPF filter for pcap")
 	var logAllPackets = flag.Bool("v", false, "Logs every packet in great detail")
 	var targetAddress = flag.String("t", "localhost:8080", "Target address a copied stream is forwarded to")
+	var duration = flag.Duration("d", 0, "how long time waiting for the response from target address after the original connection terminating normally")
 	flag.Parse()
 
 	// Set up pcap packet capture
@@ -32,7 +33,7 @@ func main() {
 	}
 
 	// Set up assembly
-	streamFactory := &stream.TcpStreamFactory{Address: *targetAddress}
+	streamFactory := &stream.TcpStreamFactory{Address: *targetAddress, Duration: *duration}
 	streamPool := tcpassembly.NewStreamPool(streamFactory)
 	assembler := tcpassembly.NewAssembler(streamPool)
 
