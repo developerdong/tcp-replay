@@ -6,10 +6,10 @@ package stream
 import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/tcpassembly/tcpreader"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"log"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -23,26 +23,26 @@ type TcpStream struct {
 
 func (t *TcpStream) run() {
 	log.Println("Start to copy new stream", t.net, t.transport)
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-	go func() {
+	g := new(errgroup.Group)
+	g.Go(func() error {
 		// discard the response
-		_, _ = io.Copy(io.Discard, t.c)
+		_, err := io.Copy(io.Discard, t.c)
 		_ = t.c.CloseRead()
-		wg.Done()
-	}()
-	go func() {
+		return err
+	})
+	g.Go(func() error {
 		// forward copied data to the remote address
-		if _, err := io.Copy(t.c, &t.r); err != nil {
-			log.Println("Error reading stream", t.net, t.transport, ":", err)
-		} else {
-			// If the original connection terminates correctly, wait for the response from
-			// new connection. Otherwise, the request in the new connection may be cancelled.
-			time.Sleep(t.duration)
-		}
+		_, err := io.Copy(t.c, &t.r)
+		_ = t.r.Close()
 		_ = t.c.CloseWrite()
-		wg.Done()
-	}()
-	wg.Wait()
+		return err
+	})
+	if err := g.Wait(); err != nil {
+		log.Println("Error reading stream", t.net, t.transport, ":", err)
+	} else {
+		// If the original connection terminates correctly, wait for the response from
+		// new connection. Otherwise, the request in the new connection may be cancelled.
+		time.Sleep(t.duration)
+	}
 	log.Println("Finish copying new stream", t.net, t.transport)
 }
