@@ -16,14 +16,22 @@ import (
 )
 
 func main() {
+	var inputFile = flag.String("i", "", "Filename to read from, stdin is the default")
 	var filter = flag.String("f", "tcp and dst port 80", "BPF filter for pcap")
 	var logAllPackets = flag.Bool("v", false, "Logs every packet in great detail")
 	var targetAddress = flag.String("t", "localhost:8080", "Target address a copied stream is forwarded to")
 	var duration = flag.Duration("d", 0, "how long time waiting for the response from target address after the original connection terminating normally")
 	flag.Parse()
 
+	var handle *pcap.Handle
+	var err error
+
 	// Set up pcap packet capture
-	handle, err := pcap.OpenOfflineFile(os.Stdin)
+	if *inputFile != "" {
+		handle, err = pcap.OpenOffline(*inputFile)
+	} else {
+		handle, err = pcap.OpenOfflineFile(os.Stdin)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -58,6 +66,7 @@ func main() {
 			}
 			tcp := packet.TransportLayer().(*layers.TCP)
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), tcp, packet.Metadata().Timestamp)
+
 		case <-ticker:
 			// Every minute, flush connections that haven't seen activity in the past 2 minutes.
 			assembler.FlushOlderThan(time.Now().Add(time.Minute * -2))
