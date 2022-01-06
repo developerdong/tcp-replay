@@ -33,12 +33,15 @@ func (t *TcpStream) run() {
 	g.Go(func() error {
 		// forward copied data to the remote address
 		_, err := io.Copy(t.c, &t.r)
-		_ = t.r.Close()
+		if err != nil {
+			// We must read until we see an EOF... very important!
+			go tcpreader.DiscardBytesToEOF(&t.r)
+		}
 		_ = t.c.CloseWrite()
 		return err
 	})
 	if err := g.Wait(); err != nil {
-		log.Println("Error reading stream", t.net, t.transport, ":", err)
+		log.Println("Error processing stream", t.net, t.transport, ":", err)
 	} else {
 		// If the original connection terminates correctly, wait for the response from
 		// new connection. Otherwise, the request in the new connection may be cancelled.
