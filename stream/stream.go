@@ -34,8 +34,11 @@ func (t *TcpStream) run() {
 		// forward copied data to the remote address
 		_, err := io.Copy(t.c, &t.r)
 		if err != nil {
-			// We must read until we see an EOF... very important!
-			go tcpreader.DiscardBytesToEOF(&t.r)
+			// Use another goroutine to discard all remaining bytes, which will not block the
+			// assembler.
+			go func() {
+				_ = t.r.Close()
+			}()
 		}
 		_ = t.c.CloseWrite()
 		return err
