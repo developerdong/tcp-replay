@@ -1,13 +1,8 @@
-/*
-Package stream builds a simple TCP parser using tcpassembly.StreamFactory and tcpassembly.Stream interfaces
-*/
 package stream
 
 import (
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/tcpassembly/tcpreader"
-	"golang.org/x/sync/errgroup"
-	"io"
+	"github.com/google/gopacket/tcpassembly"
 	"log"
 	"net"
 	"time"
@@ -17,38 +12,40 @@ import (
 type TcpStream struct {
 	net, transport gopacket.Flow
 	duration       time.Duration
-	r              tcpreader.ReaderStream
-	c              *net.TCPConn
+	conn           *net.TCPConn
+	skip           bool
 }
 
-func (t *TcpStream) run() {
-	log.Println("Start to copy new stream", t.net, t.transport)
-	g := new(errgroup.Group)
-	g.Go(func() error {
-		// discard the response
-		_, err := io.Copy(io.Discard, t.c)
-		_ = t.c.CloseRead()
-		return err
-	})
-	g.Go(func() error {
-		// forward copied data to the remote address
-		_, err := io.Copy(t.c, &t.r)
-		if err != nil {
-			// Use another goroutine to discard all remaining bytes, which will not block the
-			// assembler.
-			go func() {
-				_ = t.r.Close()
-			}()
+// Reassembled implements tcpassembly.Stream's Reassembled function.
+func (t *TcpStream) Reassembled(reassembly []tcpassembly.Reassembly) {
+	for _, r := range reassembly {
+		if r.Skip != 0 {
+			// We didn't capture the whole data.
+			log.Println("Data is skipped", t.net, t.transport, ":", r.Skip)
+			t.skip = true
 		}
-		_ = t.c.CloseWrite()
-		return err
-	})
-	if err := g.Wait(); err != nil {
-		log.Println("Error processing stream", t.net, t.transport, ":", err)
-	} else {
-		// If the original connection terminates correctly, wait for the response from
-		// new connection. Otherwise, the request in the new connection may be cancelled.
-		time.Sleep(t.duration)
+		if t.skip {
+			// We can't forward data anymore if some bytes were skipped.
+			return
+		}
+		if _, err := t.conn.Write(r.Bytes); err != nil {
+			log.Println("Error processing stream", t.net, t.transport, ":", err)
+			t.skip = true
+		}
 	}
-	log.Println("Finish copying new stream", t.net, t.transport)
+}
+
+// ReassemblyComplete implements tcpassembly.Stream's ReassemblyComplete
+// function.
+func (t *TcpStream) ReassemblyComplete() {
+	go func() {
+		if !t.skip {
+			// If we have captured the whole data from the original connection, wait for the
+			// response from new connection. Otherwise, the request in the new connection may
+			// be cancelled.
+			time.Sleep(t.duration)
+		}
+		_ = t.conn.Close()
+		log.Println("Finish copying new stream", t.net, t.transport)
+	}()
 }
