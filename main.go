@@ -17,7 +17,7 @@ import (
 
 func main() {
 	var inputFile = flag.String("i", "", "Filename to read from, stdin is the default")
-	var filter = flag.String("f", "tcp and dst port 80", "BPF filter for pcap")
+	var filter = flag.String("f", "", "BPF filter for pcap")
 	var logAllPackets = flag.Bool("v", false, "Logs every packet in great detail")
 	var targetAddress = flag.String("t", "localhost:8080", "Target address a copied stream is forwarded to")
 	var duration = flag.Duration("d", 0, "how long time waiting for the response from target address after the original connection terminating normally")
